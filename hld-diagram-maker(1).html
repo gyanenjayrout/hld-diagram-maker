@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HLD Diagram Maker</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e27;
+            --bg-secondary: #141937;
+            --bg-canvas: #1a1f3a;
+            --accent-cyan: #00fff5;
+            --accent-purple: #9d4edd;
+            --accent-orange: #ff6b35;
+            --text-primary: #e0e6ff;
+            --text-secondary: #8892b8;
+            --border: #2d3560;
+            --shadow: rgba(0, 255, 245, 0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'IBM Plex Sans', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 320px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            padding: 24px;
+            overflow-y: auto;
+            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .logo {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 20px;
+            font-weight: 800;
+            margin-bottom: 32px;
+            color: var(--accent-cyan);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 20px var(--shadow);
+        }
+
+        .section {
+            margin-bottom: 28px;
+        }
+
+        .section-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .components-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .component-item {
+            background: var(--bg-canvas);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px 12px;
+            text-align: center;
+            cursor: grab;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .component-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple));
+            transform: scaleX(0);
+            transition: transform 0.3s;
+        }
+
+        .component-item:hover {
+            border-color: var(--accent-cyan);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px var(--shadow);
+        }
+
+        .component-item:hover::before {
+            transform: scaleX(1);
+        }
+
+        .component-item:active {
+            cursor: grabbing;
+        }
+
+        .component-icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+            display: block;
+            width: 28px;
+            height: 28px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .component-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .component-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .tools {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .tool-btn {
+            background: var(--bg-canvas);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: var(--text-primary);
+            font-family: 'IBM Plex Sans', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tool-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(0, 255, 245, 0.1);
+            transform: translate(-50%, -50%);
+            transition: width 0.5s, height 0.5s;
+        }
+
+        .tool-btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .tool-btn:hover {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 4px 16px var(--shadow);
+        }
+
+        .tool-btn.active {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+            border-color: transparent;
+            color: var(--bg-primary);
+            font-weight: 600;
+        }
+
+        .tool-btn span {
+            position: relative;
+            z-index: 1;
+        }
+
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .toolbar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 24px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .toolbar-btn {
+            background: var(--bg-canvas);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 18px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .toolbar-btn:hover {
+            background: var(--accent-cyan);
+            color: var(--bg-primary);
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 20px var(--shadow);
+        }
+
+        .toolbar-btn.danger:hover {
+            background: var(--accent-orange);
+            border-color: var(--accent-orange);
+        }
+
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: 
+                linear-gradient(90deg, var(--border) 1px, transparent 1px),
+                linear-gradient(var(--border) 1px, transparent 1px);
+            background-size: 40px 40px;
+            background-position: -1px -1px;
+        }
+
+        .canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .node {
+            position: absolute;
+            min-width: 140px;
+            padding: 16px;
+            border-radius: 12px;
+            cursor: move;
+            user-select: none;
+            transition: box-shadow 0.3s;
+            backdrop-filter: blur(10px);
+        }
+
+        .node.selected {
+            box-shadow: 0 0 0 3px var(--accent-cyan);
+        }
+
+        .node-server {
+            background: linear-gradient(135deg, rgba(157, 78, 221, 0.2), rgba(157, 78, 221, 0.1));
+            border: 2px solid var(--accent-purple);
+        }
+
+        .node-database {
+            background: linear-gradient(135deg, rgba(0, 255, 245, 0.2), rgba(0, 255, 245, 0.1));
+            border: 2px solid var(--accent-cyan);
+        }
+
+        .node-storage {
+            background: linear-gradient(135deg, rgba(255, 107, 53, 0.2), rgba(255, 107, 53, 0.1));
+            border: 2px solid var(--accent-orange);
+        }
+
+        .node-api {
+            background: linear-gradient(135deg, rgba(157, 78, 221, 0.15), rgba(0, 255, 245, 0.15));
+            border: 2px solid var(--accent-purple);
+        }
+
+        .node-cache {
+            background: linear-gradient(135deg, rgba(255, 107, 53, 0.15), rgba(157, 78, 221, 0.15));
+            border: 2px solid var(--accent-orange);
+        }
+
+        .node-lb {
+            background: linear-gradient(135deg, rgba(0, 255, 245, 0.15), rgba(157, 78, 221, 0.15));
+            border: 2px solid var(--accent-cyan);
+        }
+
+        .node-queue {
+            background: linear-gradient(135deg, rgba(157, 78, 221, 0.2), rgba(0, 255, 245, 0.1));
+            border: 2px solid var(--accent-purple);
+        }
+
+        .node-client {
+            background: linear-gradient(135deg, rgba(0, 255, 245, 0.2), rgba(255, 107, 53, 0.1));
+            border: 2px solid var(--accent-cyan);
+        }
+
+        .node-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .node-icon {
+            font-size: 24px;
+        }
+
+        .node-icon img {
+            width: 24px;
+            height: 24px;
+            object-fit: contain;
+        }
+
+        .node-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            flex: 1;
+        }
+
+        .node-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .delete-btn {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--accent-orange);
+            color: white;
+            border: 2px solid var(--bg-primary);
+            cursor: pointer;
+            font-size: 14px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .node.selected .delete-btn {
+            display: flex;
+        }
+
+        svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .connection-line {
+            stroke: var(--accent-cyan);
+            stroke-width: 2;
+            fill: none;
+            opacity: 0.6;
+            filter: drop-shadow(0 0 4px var(--shadow));
+        }
+
+        .connection-line.temp {
+            stroke-dasharray: 5, 5;
+            opacity: 0.4;
+        }
+
+        .label-input {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-family: 'IBM Plex Sans', sans-serif;
+            font-size: 12px;
+            width: 100%;
+            outline: none;
+            margin-top: 4px;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.3s;
+        }
+
+        .label-input:focus {
+            border-bottom-color: var(--accent-cyan);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .component-item, .tool-btn {
+            animation: slideIn 0.4s ease-out backwards;
+        }
+
+        .component-item:nth-child(1) { animation-delay: 0.05s; }
+        .component-item:nth-child(2) { animation-delay: 0.1s; }
+        .component-item:nth-child(3) { animation-delay: 0.15s; }
+        .component-item:nth-child(4) { animation-delay: 0.2s; }
+        .component-item:nth-child(5) { animation-delay: 0.25s; }
+        .component-item:nth-child(6) { animation-delay: 0.3s; }
+        .component-item:nth-child(7) { animation-delay: 0.35s; }
+        .component-item:nth-child(8) { animation-delay: 0.4s; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="logo">⚡ HLD Maker</div>
+            
+            <div class="section">
+                <div class="section-title">Databases</div>
+                <div class="components-grid">
+                    <div class="component-item" draggable="true" data-type="mongodb">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mongodb/mongodb-original.svg" alt="MongoDB">
+                        <div class="component-label">MongoDB</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="mysql">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mysql/mysql-original.svg" alt="MySQL">
+                        <div class="component-label">MySQL</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="postgresql">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/postgresql/postgresql-original.svg" alt="PostgreSQL">
+                        <div class="component-label">PostgreSQL</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="cassandra">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/cassandra/cassandra-original.svg" alt="Cassandra">
+                        <div class="component-label">Cassandra</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="dynamodb">
+                        <img class="component-icon" src="https://upload.wikimedia.org/wikipedia/commons/f/fd/DynamoDB.png" alt="DynamoDB">
+                        <div class="component-label">DynamoDB</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="elasticsearch">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/elasticsearch/elasticsearch-original.svg" alt="Elasticsearch">
+                        <div class="component-label">Elasticsearch</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Caching & Messaging</div>
+                <div class="components-grid">
+                    <div class="component-item" draggable="true" data-type="redis">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/redis/redis-original.svg" alt="Redis">
+                        <div class="component-label">Redis</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="kafka">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/apachekafka/apachekafka-original.svg" alt="Kafka">
+                        <div class="component-label">Kafka</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="rabbitmq">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/rabbitmq/rabbitmq-original.svg" alt="RabbitMQ">
+                        <div class="component-label">RabbitMQ</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="memcached">
+                        <span class="component-icon">⚡</span>
+                        <div class="component-label">Memcached</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Backend & Frameworks</div>
+                <div class="components-grid">
+                    <div class="component-item" draggable="true" data-type="springboot">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/spring/spring-original.svg" alt="Spring Boot">
+                        <div class="component-label">Spring Boot</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="python">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg" alt="Python">
+                        <div class="component-label">Python</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="nodejs">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg" alt="Node.js">
+                        <div class="component-label">Node.js</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="django">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/django/django-plain.svg" alt="Django">
+                        <div class="component-label">Django</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="fastapi">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/fastapi/fastapi-original.svg" alt="FastAPI">
+                        <div class="component-label">FastAPI</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="dotnet">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/dotnetcore/dotnetcore-original.svg" alt=".NET">
+                        <div class="component-label">.NET Core</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">AWS Services</div>
+                <div class="components-grid">
+                    <div class="component-item" draggable="true" data-type="ec2">
+                        <img class="component-icon" src="https://upload.wikimedia.org/wikipedia/commons/b/b9/AWS_Simple_Icons_Compute_Amazon_EC2_Instances.svg" alt="EC2">
+                        <div class="component-label">EC2</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="s3">
+                        <img class="component-icon" src="https://upload.wikimedia.org/wikipedia/commons/b/bc/Amazon-S3-Logo.svg" alt="S3">
+                        <div class="component-label">S3</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="lambda">
+                        <img class="component-icon" src="https://upload.wikimedia.org/wikipedia/commons/6/6c/AWS_Lambda_logo.svg" alt="Lambda">
+                        <div class="component-label">Lambda</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="rds">
+                        <span class="component-icon">🗄️</span>
+                        <div class="component-label">RDS</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="cloudfront">
+                        <span class="component-icon">🌐</span>
+                        <div class="component-label">CloudFront</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="sqs">
+                        <span class="component-icon">📨</span>
+                        <div class="component-label">SQS</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="sns">
+                        <span class="component-icon">📢</span>
+                        <div class="component-label">SNS</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="apigateway">
+                        <span class="component-icon">🚪</span>
+                        <div class="component-label">API Gateway</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Container & Orchestration</div>
+                <div class="components-grid">
+                    <div class="component-item" draggable="true" data-type="docker">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg" alt="Docker">
+                        <div class="component-label">Docker</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="kubernetes">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/kubernetes/kubernetes-plain.svg" alt="Kubernetes">
+                        <div class="component-label">Kubernetes</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="helm">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/helm/helm-original.svg" alt="Helm">
+                        <div class="component-label">Helm</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="ecs">
+                        <span class="component-icon">📦</span>
+                        <div class="component-label">ECS</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Infrastructure</div>
+                <div class="components-grid">
+                    <div class="component-item" draggable="true" data-type="loadbalancer">
+                        <span class="component-icon">⚖️</span>
+                        <div class="component-label">Load Balancer</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="nginx">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nginx/nginx-original.svg" alt="Nginx">
+                        <div class="component-label">Nginx</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="ratelimiter">
+                        <span class="component-icon">🚦</span>
+                        <div class="component-label">Rate Limiter</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="cdn">
+                        <span class="component-icon">🌍</span>
+                        <div class="component-label">CDN</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="firewall">
+                        <span class="component-icon">🛡️</span>
+                        <div class="component-label">Firewall</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="vpc">
+                        <span class="component-icon">🔒</span>
+                        <div class="component-label">VPC</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Monitoring & CI/CD</div>
+                <div class="components-grid">
+                    <div class="component-item" draggable="true" data-type="prometheus">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/prometheus/prometheus-original.svg" alt="Prometheus">
+                        <div class="component-label">Prometheus</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="grafana">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/grafana/grafana-original.svg" alt="Grafana">
+                        <div class="component-label">Grafana</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="jenkins">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/jenkins/jenkins-original.svg" alt="Jenkins">
+                        <div class="component-label">Jenkins</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="github">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" alt="GitHub">
+                        <div class="component-label">GitHub</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="gitlab">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/gitlab/gitlab-original.svg" alt="GitLab">
+                        <div class="component-label">GitLab</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="datadog">
+                        <span class="component-icon">🐶</span>
+                        <div class="component-label">Datadog</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Client & Frontend</div>
+                <div class="components-grid">
+                    <div class="component-item" draggable="true" data-type="react">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg" alt="React">
+                        <div class="component-label">React</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="angular">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/angularjs/angularjs-original.svg" alt="Angular">
+                        <div class="component-label">Angular</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="vue">
+                        <img class="component-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/vuejs/vuejs-original.svg" alt="Vue">
+                        <div class="component-label">Vue.js</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="mobile">
+                        <span class="component-icon">📱</span>
+                        <div class="component-label">Mobile App</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="browser">
+                        <span class="component-icon">🌐</span>
+                        <div class="component-label">Web Browser</div>
+                    </div>
+                    <div class="component-item" draggable="true" data-type="client">
+                        <span class="component-icon">👤</span>
+                        <div class="component-label">User</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Tools</div>
+                <div class="tools">
+                    <button class="tool-btn" id="selectMode">
+                        <span>🖱️ Select</span>
+                    </button>
+                    <button class="tool-btn" id="connectMode">
+                        <span>🔗 Connect</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-area">
+            <div class="toolbar">
+                <button class="toolbar-btn" id="exportPNG">Export PNG</button>
+                <button class="toolbar-btn" id="exportSVG">Export SVG</button>
+                <button class="toolbar-btn danger" id="clearCanvas">Clear All</button>
+            </div>
+            <div class="canvas-container">
+                <svg id="connectionsSVG"></svg>
+                <div class="canvas" id="canvas"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const svg = document.getElementById('connectionsSVG');
+        const selectModeBtn = document.getElementById('selectMode');
+        const connectModeBtn = document.getElementById('connectMode');
+        
+        let nodes = [];
+        let connections = [];
+        let nodeCounter = 0;
+        let selectedNode = null;
+        let mode = 'select';
+        let connectingFrom = null;
+        let tempLine = null;
+
+        const componentLabels = {
+            // Databases
+            mongodb: 'MongoDB',
+            mysql: 'MySQL',
+            postgresql: 'PostgreSQL',
+            cassandra: 'Cassandra',
+            dynamodb: 'DynamoDB',
+            elasticsearch: 'Elasticsearch',
+            // Caching & Messaging
+            redis: 'Redis',
+            kafka: 'Kafka',
+            rabbitmq: 'RabbitMQ',
+            memcached: 'Memcached',
+            // Backend & Frameworks
+            springboot: 'Spring Boot',
+            python: 'Python',
+            nodejs: 'Node.js',
+            django: 'Django',
+            fastapi: 'FastAPI',
+            dotnet: '.NET Core',
+            // AWS Services
+            ec2: 'EC2',
+            s3: 'S3',
+            lambda: 'Lambda',
+            rds: 'RDS',
+            cloudfront: 'CloudFront',
+            sqs: 'SQS',
+            sns: 'SNS',
+            apigateway: 'API Gateway',
+            // Container & Orchestration
+            docker: 'Docker',
+            kubernetes: 'Kubernetes',
+            helm: 'Helm',
+            ecs: 'ECS',
+            // Infrastructure
+            loadbalancer: 'Load Balancer',
+            nginx: 'Nginx',
+            ratelimiter: 'Rate Limiter',
+            cdn: 'CDN',
+            firewall: 'Firewall',
+            vpc: 'VPC',
+            // Monitoring & CI/CD
+            prometheus: 'Prometheus',
+            grafana: 'Grafana',
+            jenkins: 'Jenkins',
+            github: 'GitHub',
+            gitlab: 'GitLab',
+            datadog: 'Datadog',
+            // Client & Frontend
+            react: 'React',
+            angular: 'Angular',
+            vue: 'Vue.js',
+            mobile: 'Mobile App',
+            browser: 'Web Browser',
+            client: 'User'
+        };
+
+        const componentIcons = {
+            // Databases
+            mongodb: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mongodb/mongodb-original.svg" style="width:24px;height:24px">',
+            mysql: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mysql/mysql-original.svg" style="width:24px;height:24px">',
+            postgresql: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/postgresql/postgresql-original.svg" style="width:24px;height:24px">',
+            cassandra: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/cassandra/cassandra-original.svg" style="width:24px;height:24px">',
+            dynamodb: '<img src="https://upload.wikimedia.org/wikipedia/commons/f/fd/DynamoDB.png" style="width:24px;height:24px">',
+            elasticsearch: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/elasticsearch/elasticsearch-original.svg" style="width:24px;height:24px">',
+            // Caching & Messaging
+            redis: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/redis/redis-original.svg" style="width:24px;height:24px">',
+            kafka: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/apachekafka/apachekafka-original.svg" style="width:24px;height:24px">',
+            rabbitmq: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/rabbitmq/rabbitmq-original.svg" style="width:24px;height:24px">',
+            memcached: '⚡',
+            // Backend & Frameworks
+            springboot: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/spring/spring-original.svg" style="width:24px;height:24px">',
+            python: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg" style="width:24px;height:24px">',
+            nodejs: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg" style="width:24px;height:24px">',
+            django: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/django/django-plain.svg" style="width:24px;height:24px">',
+            fastapi: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/fastapi/fastapi-original.svg" style="width:24px;height:24px">',
+            dotnet: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/dotnetcore/dotnetcore-original.svg" style="width:24px;height:24px">',
+            // AWS Services
+            ec2: '<img src="https://upload.wikimedia.org/wikipedia/commons/b/b9/AWS_Simple_Icons_Compute_Amazon_EC2_Instances.svg" style="width:24px;height:24px">',
+            s3: '<img src="https://upload.wikimedia.org/wikipedia/commons/b/bc/Amazon-S3-Logo.svg" style="width:24px;height:24px">',
+            lambda: '<img src="https://upload.wikimedia.org/wikipedia/commons/6/6c/AWS_Lambda_logo.svg" style="width:24px;height:24px">',
+            rds: '🗄️',
+            cloudfront: '🌐',
+            sqs: '📨',
+            sns: '📢',
+            apigateway: '🚪',
+            // Container & Orchestration
+            docker: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg" style="width:24px;height:24px">',
+            kubernetes: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/kubernetes/kubernetes-plain.svg" style="width:24px;height:24px">',
+            helm: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/helm/helm-original.svg" style="width:24px;height:24px">',
+            ecs: '📦',
+            // Infrastructure
+            loadbalancer: '⚖️',
+            nginx: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nginx/nginx-original.svg" style="width:24px;height:24px">',
+            ratelimiter: '🚦',
+            cdn: '🌍',
+            firewall: '🛡️',
+            vpc: '🔒',
+            // Monitoring & CI/CD
+            prometheus: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/prometheus/prometheus-original.svg" style="width:24px;height:24px">',
+            grafana: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/grafana/grafana-original.svg" style="width:24px;height:24px">',
+            jenkins: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/jenkins/jenkins-original.svg" style="width:24px;height:24px">',
+            github: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" style="width:24px;height:24px">',
+            gitlab: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/gitlab/gitlab-original.svg" style="width:24px;height:24px">',
+            datadog: '🐶',
+            // Client & Frontend
+            react: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg" style="width:24px;height:24px">',
+            angular: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/angularjs/angularjs-original.svg" style="width:24px;height:24px">',
+            vue: '<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/vuejs/vuejs-original.svg" style="width:24px;height:24px">',
+            mobile: '📱',
+            browser: '🌐',
+            client: '👤'
+        };
+
+        // Drag from sidebar
+        document.querySelectorAll('.component-item').forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('type', item.dataset.type);
+            });
+        });
+
+        canvas.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        canvas.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const type = e.dataTransfer.getData('type');
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            createNode(type, x, y);
+        });
+
+        function createNode(type, x, y) {
+            const nodeId = `node-${nodeCounter++}`;
+            const node = document.createElement('div');
+            
+            // Categorize components for styling
+            const databases = ['mongodb', 'mysql', 'postgresql', 'cassandra', 'dynamodb', 'elasticsearch', 'rds'];
+            const caching = ['redis', 'memcached'];
+            const messaging = ['kafka', 'rabbitmq', 'sqs', 'sns'];
+            const backend = ['springboot', 'python', 'nodejs', 'django', 'fastapi', 'dotnet'];
+            const containers = ['docker', 'kubernetes', 'helm', 'ecs'];
+            const storage = ['s3', 'cloudfront', 'cdn'];
+            const infrastructure = ['loadbalancer', 'nginx', 'ratelimiter', 'firewall', 'vpc', 'ec2'];
+            const monitoring = ['prometheus', 'grafana', 'datadog'];
+            const cicd = ['jenkins', 'github', 'gitlab'];
+            const frontend = ['react', 'angular', 'vue', 'mobile', 'browser', 'client'];
+            const aws = ['lambda', 'apigateway'];
+            
+            let styleClass = 'node-api'; // default
+            
+            if (databases.includes(type)) styleClass = 'node-database';
+            else if (caching.includes(type)) styleClass = 'node-cache';
+            else if (messaging.includes(type)) styleClass = 'node-queue';
+            else if (backend.includes(type)) styleClass = 'node-server';
+            else if (containers.includes(type)) styleClass = 'node-lb';
+            else if (storage.includes(type)) styleClass = 'node-storage';
+            else if (infrastructure.includes(type)) styleClass = 'node-lb';
+            else if (monitoring.includes(type)) styleClass = 'node-api';
+            else if (cicd.includes(type)) styleClass = 'node-server';
+            else if (frontend.includes(type)) styleClass = 'node-client';
+            else if (aws.includes(type)) styleClass = 'node-api';
+            
+            node.className = `node ${styleClass}`;
+            node.id = nodeId;
+            node.style.left = `${x}px`;
+            node.style.top = `${y}px`;
+            
+            node.innerHTML = `
+                <div class="node-header">
+                    <span class="node-icon">${componentIcons[type]}</span>
+                    <div class="node-title">${componentLabels[type]}</div>
+                </div>
+                <input type="text" class="label-input" placeholder="Add description..." />
+                <button class="delete-btn">×</button>
+            `;
+
+            canvas.appendChild(node);
+            
+            nodes.push({
+                id: nodeId,
+                type: type,
+                element: node,
+                x: x,
+                y: y
+            });
+
+            makeDraggable(node);
+            
+            node.addEventListener('click', (e) => {
+                if (mode === 'select') {
+                    selectNode(node);
+                } else if (mode === 'connect') {
+                    handleConnect(nodeId);
+                }
+            });
+
+            node.querySelector('.delete-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteNode(nodeId);
+            });
+        }
+
+        function makeDraggable(node) {
+            let isDragging = false;
+            let startX, startY, initialLeft, initialTop;
+
+            node.addEventListener('mousedown', (e) => {
+                if (e.target.classList.contains('label-input') || 
+                    e.target.classList.contains('delete-btn')) return;
+                
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                initialLeft = parseInt(node.style.left);
+                initialTop = parseInt(node.style.top);
+                
+                node.style.cursor = 'grabbing';
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                
+                const newLeft = initialLeft + dx;
+                const newTop = initialTop + dy;
+                
+                node.style.left = `${newLeft}px`;
+                node.style.top = `${newTop}px`;
+                
+                const nodeData = nodes.find(n => n.id === node.id);
+                if (nodeData) {
+                    nodeData.x = newLeft;
+                    nodeData.y = newTop;
+                }
+                
+                updateConnections();
+            });
+
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+                node.style.cursor = 'move';
+            });
+        }
+
+        function selectNode(node) {
+            document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
+            node.classList.add('selected');
+            selectedNode = node;
+        }
+
+        function handleConnect(nodeId) {
+            if (!connectingFrom) {
+                connectingFrom = nodeId;
+                const node = nodes.find(n => n.id === nodeId);
+                if (node) {
+                    node.element.style.boxShadow = '0 0 0 3px var(--accent-purple)';
+                }
+            } else {
+                if (connectingFrom !== nodeId) {
+                    createConnection(connectingFrom, nodeId);
+                }
+                const node = nodes.find(n => n.id === connectingFrom);
+                if (node) {
+                    node.element.style.boxShadow = '';
+                }
+                connectingFrom = null;
+            }
+        }
+
+        function createConnection(fromId, toId) {
+            connections.push({ from: fromId, to: toId });
+            updateConnections();
+        }
+
+        function updateConnections() {
+            svg.innerHTML = '';
+            
+            connections.forEach(conn => {
+                const fromNode = nodes.find(n => n.id === conn.from);
+                const toNode = nodes.find(n => n.id === conn.to);
+                
+                if (fromNode && toNode) {
+                    const fromRect = fromNode.element.getBoundingClientRect();
+                    const toRect = toNode.element.getBoundingClientRect();
+                    const canvasRect = canvas.getBoundingClientRect();
+                    
+                    const x1 = fromRect.left - canvasRect.left + fromRect.width / 2;
+                    const y1 = fromRect.top - canvasRect.top + fromRect.height / 2;
+                    const x2 = toRect.left - canvasRect.left + toRect.width / 2;
+                    const y2 = toRect.top - canvasRect.top + toRect.height / 2;
+                    
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    const d = `M ${x1} ${y1} Q ${(x1+x2)/2} ${(y1+y2)/2 - 50} ${x2} ${y2}`;
+                    line.setAttribute('d', d);
+                    line.setAttribute('class', 'connection-line');
+                    svg.appendChild(line);
+                    
+                    // Arrow head
+                    const angle = Math.atan2(y2 - y1, x2 - x1);
+                    const arrowSize = 10;
+                    const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                    const points = [
+                        [x2, y2],
+                        [x2 - arrowSize * Math.cos(angle - Math.PI / 6), y2 - arrowSize * Math.sin(angle - Math.PI / 6)],
+                        [x2 - arrowSize * Math.cos(angle + Math.PI / 6), y2 - arrowSize * Math.sin(angle + Math.PI / 6)]
+                    ];
+                    arrow.setAttribute('points', points.map(p => p.join(',')).join(' '));
+                    arrow.setAttribute('fill', 'var(--accent-cyan)');
+                    arrow.setAttribute('opacity', '0.6');
+                    svg.appendChild(arrow);
+                }
+            });
+        }
+
+        function deleteNode(nodeId) {
+            const nodeIndex = nodes.findIndex(n => n.id === nodeId);
+            if (nodeIndex > -1) {
+                const node = nodes[nodeIndex];
+                node.element.remove();
+                nodes.splice(nodeIndex, 1);
+                
+                connections = connections.filter(c => c.from !== nodeId && c.to !== nodeId);
+                updateConnections();
+            }
+        }
+
+        // Mode switching
+        selectModeBtn.addEventListener('click', () => {
+            mode = 'select';
+            selectModeBtn.classList.add('active');
+            connectModeBtn.classList.remove('active');
+            connectingFrom = null;
+            nodes.forEach(n => n.element.style.boxShadow = '');
+        });
+
+        connectModeBtn.addEventListener('click', () => {
+            mode = 'connect';
+            connectModeBtn.classList.add('active');
+            selectModeBtn.classList.remove('active');
+        });
+
+        // Initialize select mode
+        selectModeBtn.classList.add('active');
+
+        // Export functions
+        document.getElementById('exportPNG').addEventListener('click', async () => {
+            const canvasRect = canvas.getBoundingClientRect();
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvasRect.width;
+            tempCanvas.height = canvasRect.height;
+            const ctx = tempCanvas.getContext('2d');
+            
+            // Background
+            ctx.fillStyle = '#1a1f3a';
+            ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            
+            // Grid
+            ctx.strokeStyle = '#2d3560';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < tempCanvas.width; x += 40) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, tempCanvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < tempCanvas.height; y += 40) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(tempCanvas.width, y);
+                ctx.stroke();
+            }
+            
+            // Draw connections
+            connections.forEach(conn => {
+                const fromNode = nodes.find(n => n.id === conn.from);
+                const toNode = nodes.find(n => n.id === conn.to);
+                
+                if (fromNode && toNode) {
+                    const x1 = fromNode.x + 70;
+                    const y1 = fromNode.y + 40;
+                    const x2 = toNode.x + 70;
+                    const y2 = toNode.y + 40;
+                    
+                    ctx.strokeStyle = '#00fff5';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.quadraticCurveTo((x1+x2)/2, (y1+y2)/2 - 50, x2, y2);
+                    ctx.stroke();
+                    
+                    // Arrow
+                    const angle = Math.atan2(y2 - y1, x2 - x1);
+                    ctx.fillStyle = '#00fff5';
+                    ctx.beginPath();
+                    ctx.moveTo(x2, y2);
+                    ctx.lineTo(x2 - 10 * Math.cos(angle - Math.PI / 6), y2 - 10 * Math.sin(angle - Math.PI / 6));
+                    ctx.lineTo(x2 - 10 * Math.cos(angle + Math.PI / 6), y2 - 10 * Math.sin(angle + Math.PI / 6));
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            });
+            
+            // Draw nodes
+            for (const node of nodes) {
+                const el = node.element;
+                const x = node.x;
+                const y = node.y;
+                const width = el.offsetWidth;
+                const height = el.offsetHeight;
+                
+                // Categorize for coloring
+                const databases = ['mongodb', 'mysql', 'postgresql', 'cassandra', 'dynamodb', 'elasticsearch', 'rds'];
+                const caching = ['redis', 'memcached'];
+                const messaging = ['kafka', 'rabbitmq', 'sqs', 'sns'];
+                const storage = ['s3', 'cloudfront', 'cdn'];
+                
+                // Node background
+                const gradient = ctx.createLinearGradient(x, y, x + width, y + height);
+                if (databases.includes(node.type)) {
+                    gradient.addColorStop(0, 'rgba(0, 255, 245, 0.2)');
+                    gradient.addColorStop(1, 'rgba(0, 255, 245, 0.1)');
+                    ctx.strokeStyle = '#00fff5';
+                } else if (caching.includes(node.type)) {
+                    gradient.addColorStop(0, 'rgba(255, 107, 53, 0.15)');
+                    gradient.addColorStop(1, 'rgba(157, 78, 221, 0.15)');
+                    ctx.strokeStyle = '#ff6b35';
+                } else if (messaging.includes(node.type)) {
+                    gradient.addColorStop(0, 'rgba(157, 78, 221, 0.2)');
+                    gradient.addColorStop(1, 'rgba(0, 255, 245, 0.1)');
+                    ctx.strokeStyle = '#9d4edd';
+                } else if (storage.includes(node.type)) {
+                    gradient.addColorStop(0, 'rgba(255, 107, 53, 0.2)');
+                    gradient.addColorStop(1, 'rgba(255, 107, 53, 0.1)');
+                    ctx.strokeStyle = '#ff6b35';
+                } else {
+                    gradient.addColorStop(0, 'rgba(157, 78, 221, 0.15)');
+                    gradient.addColorStop(1, 'rgba(0, 255, 245, 0.15)');
+                    ctx.strokeStyle = '#9d4edd';
+                }
+                
+                ctx.fillStyle = gradient;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(x, y, width, height, 12);
+                ctx.fill();
+                ctx.stroke();
+                
+                // Node text
+                ctx.fillStyle = '#e0e6ff';
+                ctx.font = '600 14px "JetBrains Mono"';
+                ctx.fillText(componentLabels[node.type], x + 40, y + 30);
+                
+                const labelInput = el.querySelector('.label-input');
+                if (labelInput && labelInput.value) {
+                    ctx.fillStyle = '#8892b8';
+                    ctx.font = '400 12px "IBM Plex Sans"';
+                    ctx.fillText(labelInput.value, x + 16, y + 55);
+                }
+            }
+            
+            const link = document.createElement('a');
+            link.download = 'hld-diagram.png';
+            link.href = tempCanvas.toDataURL();
+            link.click();
+        });
+
+        document.getElementById('exportSVG').addEventListener('click', () => {
+            let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1500">
+                <rect width="100%" height="100%" fill="#1a1f3a"/>
+                <defs>
+                    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#2d3560" stroke-width="1"/>
+                    </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grid)"/>`;
+            
+            // Add connections
+            connections.forEach(conn => {
+                const fromNode = nodes.find(n => n.id === conn.from);
+                const toNode = nodes.find(n => n.id === conn.to);
+                
+                if (fromNode && toNode) {
+                    const x1 = fromNode.x + 70;
+                    const y1 = fromNode.y + 40;
+                    const x2 = toNode.x + 70;
+                    const y2 = toNode.y + 40;
+                    
+                    svgContent += `<path d="M ${x1} ${y1} Q ${(x1+x2)/2} ${(y1+y2)/2 - 50} ${x2} ${y2}" 
+                        stroke="#00fff5" stroke-width="2" fill="none" opacity="0.6"/>`;
+                    
+                    const angle = Math.atan2(y2 - y1, x2 - x1);
+                    const points = [
+                        [x2, y2],
+                        [x2 - 10 * Math.cos(angle - Math.PI / 6), y2 - 10 * Math.sin(angle - Math.PI / 6)],
+                        [x2 - 10 * Math.cos(angle + Math.PI / 6), y2 - 10 * Math.sin(angle + Math.PI / 6)]
+                    ];
+                    svgContent += `<polygon points="${points.map(p => p.join(',')).join(' ')}" 
+                        fill="#00fff5" opacity="0.6"/>`;
+                }
+            });
+            
+            // Add nodes
+            nodes.forEach(node => {
+                const x = node.x;
+                const y = node.y;
+                const w = node.element.offsetWidth;
+                const h = node.element.offsetHeight;
+                
+                const databases = ['mongodb', 'mysql', 'postgresql', 'cassandra', 'dynamodb', 'elasticsearch', 'rds'];
+                const caching = ['redis', 'memcached'];
+                const storage = ['s3', 'cloudfront', 'cdn'];
+                
+                let color = '#9d4edd';
+                if (databases.includes(node.type)) color = '#00fff5';
+                else if (caching.includes(node.type)) color = '#ff6b35';
+                else if (storage.includes(node.type)) color = '#ff6b35';
+                
+                svgContent += `<rect x="${x}" y="${y}" width="${w}" height="${h}" 
+                    rx="12" fill="rgba(157, 78, 221, 0.1)" stroke="${color}" stroke-width="2"/>`;
+                svgContent += `<text x="${x + 40}" y="${y + 30}" fill="#e0e6ff" 
+                    font-family="JetBrains Mono" font-size="14" font-weight="600">${componentLabels[node.type]}</text>`;
+                
+                const labelInput = node.element.querySelector('.label-input');
+                if (labelInput && labelInput.value) {
+                    svgContent += `<text x="${x + 16}" y="${y + 55}" fill="#8892b8" 
+                        font-family="IBM Plex Sans" font-size="12">${labelInput.value}</text>`;
+                }
+            });
+            
+            svgContent += '</svg>';
+            
+            const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = 'hld-diagram.svg';
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+        });
+
+        document.getElementById('clearCanvas').addEventListener('click', () => {
+            if (confirm('Clear all components and connections?')) {
+                canvas.innerHTML = '<svg id="connectionsSVG"></svg>';
+                nodes = [];
+                connections = [];
+                svg.innerHTML = '';
+            }
+        });
+
+        // Deselect on canvas click
+        canvas.addEventListener('click', (e) => {
+            if (e.target === canvas) {
+                document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
+                selectedNode = null;
+            }
+        });
+    </script>
+</body>
+</html>
